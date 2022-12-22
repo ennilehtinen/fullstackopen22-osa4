@@ -52,8 +52,7 @@ describe('blogs e2e', () => {
       .send({
         title: 'New blog',
         author: 'Enni',
-        url: 'http://google.com',
-        likes: 0
+        url: 'http://google.com'
       })
       .expect(201)
       .expect('Content-Type', /application\/json/)
@@ -63,8 +62,25 @@ describe('blogs e2e', () => {
       .expect(200)
       .expect('Content-Type', /application\/json/)
 
-    console.log(blogs.body)
     expect(blogs.body.length).toBe(initialBlogs.length + 1)
     expect(blogs.body[initialBlogs.length].title).toBe('New blog')
+    expect(blogs.body[initialBlogs.length].likes).toBe(0)
+  })
+
+  test('new blog is not created when missing title or url', async () => {
+    await api
+      .post('/api/blogs')
+      .send({
+        author: 'Enni'
+      })
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    const blogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    expect(blogs.body.length).toBe(initialBlogs.length)
   })
 })
