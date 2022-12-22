@@ -83,4 +83,46 @@ describe('blogs e2e', () => {
 
     expect(blogs.body.length).toBe(initialBlogs.length)
   })
+
+  test('blog is deleted', async () => {
+    const blogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    await api.delete(`/api/blogs/${blogs.body[0].id}`).expect(204)
+
+    const remainingBlogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    expect(remainingBlogs.body.length).toBe(initialBlogs.length - 1)
+    expect(remainingBlogs.body[0].title).toBe(initialBlogs[1].title)
+  })
+
+  test('blog can be edited', async () => {
+    const blogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    const newTitle = 'Hello World!'
+    const newLikes = 1000
+
+    await api
+      .patch(`/api/blogs/${blogs.body[0].id}`)
+      .send({ title: newTitle, likes: newLikes })
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    const newBlogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    expect(newBlogs.body[0].title).toBe(newTitle)
+    expect(newBlogs.body[0].likes).toBe(newLikes)
+    expect(newBlogs.body[0].url).toBe(initialBlogs[0].url)
+  })
 })
