@@ -42,5 +42,29 @@ describe('blogs e2e', () => {
     expect(blogs.body[0].title).toBe(initialBlogs[0].title)
     expect(blogs.body[1].title).toBe(initialBlogs[1].title)
     expect(blogs.body.length).toBe(initialBlogs.length)
+
+    expect(blogs.body[0].id).toBeDefined()
+  })
+
+  test('new blog is created', async () => {
+    await api
+      .post('/api/blogs')
+      .send({
+        title: 'New blog',
+        author: 'Enni',
+        url: 'http://google.com',
+        likes: 0
+      })
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+
+    const blogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    console.log(blogs.body)
+    expect(blogs.body.length).toBe(initialBlogs.length + 1)
+    expect(blogs.body[initialBlogs.length].title).toBe('New blog')
   })
 })
