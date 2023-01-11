@@ -1,21 +1,16 @@
-const jwt = require('jsonwebtoken')
 const blogsRouter = require('express').Router()
 const Blog = require('../models/blog')
-const User = require('../models/user')
+const middleware = require('../utils/middleware')
 
 blogsRouter.get('/', async (request, response) => {
   const blogs = await Blog.find({}).populate('user', { username: 1, name: 1 })
   response.json(blogs)
 })
 
-blogsRouter.post('/', async (request, response) => {
+blogsRouter.post('/', middleware.userExtractor, async (request, response) => {
   const body = request.body
 
-  const decodedToken = jwt.verify(request.token, process.env.SECRET)
-  if (!request.token || !decodedToken.id) {
-    return response.status(401).json({ error: 'token missing or invalid' })
-  }
-  const user = await User.findById(decodedToken.id)
+  const user = request.user
 
   const blog = new Blog(body)
 
@@ -40,23 +35,39 @@ blogsRouter.post('/', async (request, response) => {
   response.status(201).json(newBlog)
 })
 
-blogsRouter.delete('/:id', async (request, response) => {
-  await Blog.findByIdAndRemove(request.params.id)
-  response.status(204).end()
-})
+blogsRouter.delete(
+  '/:id',
+  middleware.userExtractor,
+  async (request, response) => {
+    const user = request.user
 
-blogsRouter.patch('/:id', async (request, response) => {
-  const blog = await Blog.findById(request.params.id)
+    const blog = await Blog.findById(request.params.id)
 
-  const allowedKeys = ['title', 'url', 'likes', 'author']
+    if (blog.user.toString() !== user.id.toString()) {
+      return response.status(401).json({ error: 'no permissions' })
+    }
 
-  allowedKeys.map(key => {
-    blog[key] = request.body[key] ?? blog[key]
-  })
+    await Blog.findByIdAndRemove(request.params.id)
+    response.status(204).end()
+  }
+)
 
-  await blog.save()
+blogsRouter.patch(
+  '/:id',
+  middleware.userExtractor,
+  async (request, response) => {
+    const blog = await Blog.findById(request.params.id)
 
-  response.status(200).json(blog)
-})
+    const allowedKeys = ['title', 'url', 'likes', 'author']
+
+    allowedKeys.map(key => {
+      blog[key] = request.body[key] ?? blog[key]
+    })
+
+    await blog.save()
+
+    response.status(200).json(blog)
+  }
+)
 
 module.exports = blogsRouter

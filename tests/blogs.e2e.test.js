@@ -1,9 +1,19 @@
 const mongoose = require('mongoose')
 const supertest = require('supertest')
+const jwt = require('jsonwebtoken')
 const app = require('../app')
 const Blog = require('../models/blog')
+const User = require('../models/user')
 
 const api = supertest(app)
+
+const testUser = {
+  username: 'test',
+  password: 'test',
+  name: 'Test'
+}
+
+let accessToken
 
 const initialBlogs = [
   {
@@ -22,6 +32,20 @@ const initialBlogs = [
 
 describe('blogs e2e', () => {
   beforeEach(async () => {
+    await User.deleteMany({})
+    const userObject = new User(testUser)
+    await userObject.save()
+
+    const userForToken = {
+      username: userObject.username,
+      id: userObject._id
+    }
+
+    initialBlogs[0].user = userObject._id
+    initialBlogs[1].user = userObject._id
+
+    accessToken = jwt.sign(userForToken, process.env.SECRET)
+
     await Blog.deleteMany({})
     let blogObject = new Blog(initialBlogs[0])
     await blogObject.save()
@@ -49,6 +73,7 @@ describe('blogs e2e', () => {
   test('new blog is created', async () => {
     await api
       .post('/api/blogs')
+      .set({ Authorization: `bearer ${accessToken}` })
       .send({
         title: 'New blog',
         author: 'Enni',
@@ -70,10 +95,28 @@ describe('blogs e2e', () => {
   test('new blog is not created when missing title or url', async () => {
     await api
       .post('/api/blogs')
+      .set({ Authorization: `bearer ${accessToken}` })
       .send({
         author: 'Enni'
       })
       .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    const blogs = await api
+      .get('/api/blogs')
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    expect(blogs.body.length).toBe(initialBlogs.length)
+  })
+
+  test('new blog is not created when missing auth token', async () => {
+    await api
+      .post('/api/blogs')
+      .send({
+        author: 'Enni'
+      })
+      .expect(401)
       .expect('Content-Type', /application\/json/)
 
     const blogs = await api
@@ -90,7 +133,10 @@ describe('blogs e2e', () => {
       .expect(200)
       .expect('Content-Type', /application\/json/)
 
-    await api.delete(`/api/blogs/${blogs.body[0].id}`).expect(204)
+    await api
+      .delete(`/api/blogs/${blogs.body[0].id}`)
+      .set({ Authorization: `bearer ${accessToken}` })
+      .expect(204)
 
     const remainingBlogs = await api
       .get('/api/blogs')
@@ -112,6 +158,7 @@ describe('blogs e2e', () => {
 
     await api
       .patch(`/api/blogs/${blogs.body[0].id}`)
+      .set({ Authorization: `bearer ${accessToken}` })
       .send({ title: newTitle, likes: newLikes })
       .expect(200)
       .expect('Content-Type', /application\/json/)
